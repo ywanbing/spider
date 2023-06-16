@@ -21,4 +21,25 @@ type Message interface {
 
 	// SetBody 设置消息的内容
 	SetBody([]byte)
+
+	// Check 自我检查
+	Check() error
 }
+
+type MsgType int32
+
+const (
+	MsgTypeUnknown   MsgType = 0
+	MsgTypeRequest   MsgType = 1
+	MsgTypeReply     MsgType = 2
+	MsgTypePush      MsgType = 3
+	MsgTypeHeartBeat MsgType = 4
+)
+
+// 定义一些默认的消息头的Key
+const (
+	MsgTypeKey = "msg_type"
+	MsgSeq     = "msg_seq"
+	MsgErr     = "msg_err"
+	OpenTrance = "open_trance"
+)

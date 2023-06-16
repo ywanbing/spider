@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ywanbing/spider/common"
+	"github.com/ywanbing/spider/message"
 )
 
 type TcpServer struct {
@@ -81,7 +82,7 @@ func (t *TcpServer) listenAndServeTCP(network, addr string) error {
 			return err
 		}
 
-		tcpConnObj := NewTcpConn(conn.(*net.TCPConn), t.cfg)
+		tcpConnObj := NewTcpConn(conn.(*net.TCPConn), t.cfg, t.handleMessage)
 		go t.handleConn(tcpConnObj)
 	}
 
@@ -128,7 +129,7 @@ func (t *TcpServer) conManger() {
 			t.connMapLock.Unlock()
 
 			// 2. 接收数据
-			conn.Start(t)
+			conn.Start()
 		case conn := <-t.closeConnChan:
 			_ = conn.Close()
 			// 1. 连接管理
@@ -157,13 +158,43 @@ func (t *TcpServer) IsClosed() bool {
 	}
 }
 
-func handleMessage(ctx *Context) {
+// RegisterGlobalMiddle add global routing middle handlers.
+func (t *TcpServer) RegisterGlobalMiddle(middles ...func(ctx *Context)) {
+	t.mux.RegisterGlobalMiddle(middles...)
+}
+
+// RegisterModelMiddle add routing middle handlers by modelID.
+func (t *TcpServer) RegisterModelMiddle(id modelID, middles ...func(ctx *Context)) {
+	t.mux.RegisterModelMiddle(id, middles...)
+}
+
+// RegisterHandler add routing handlers by modelID and subMsgID.
+func (t *TcpServer) RegisterHandler(id modelID, subID subMsgID, handler func(ctx *Context), middles ...func(ctx *Context)) {
+	t.mux.RegisterHandler(id, subID, handler, middles...)
+}
+
+// handleMessage 服务器处理消息
+func (t *TcpServer) handleMessage(ctx *Context) {
+	header := ctx.reqMsg.GetHeader()
+	switch header[message.MsgTypeKey] {
+	case message.MsgTypeRequest:
+		// 请求消息
+		t.HandleRequest(ctx)
+	case message.MsgTypeHeartBeat:
+		// 心跳消息
+		t.HandleHeartBeat(ctx)
+	default:
+		//	TODO log
+	}
+}
+
+// HandleRequest 处理请求消息
+func (t *TcpServer) HandleRequest(ctx *Context) {
 	msgId := ctx.reqMsg.GetMsgId()
 	modelId := common.GetModelId(msgId)
 	subMsgId := common.GetSubMsgId(msgId)
 
-	tcpX := ctx.t
-	handler, ok := tcpX.mux.Handlers[modelId]
+	handler, ok := t.mux.Handlers[modelId]
 	if !ok {
 		// TODO: log
 		return
@@ -175,19 +206,12 @@ func handleMessage(ctx *Context) {
 		return
 	}
 
-	// 心跳包，默认 modelId = 0
-	if tcpX.cfg.HeartBeatOn && subMsgId == tcpX.cfg.HeartBeatMessageID {
-		// 心跳包处理
-		f(ctx)
-		return
-	}
-
 	if ctx.handlers == nil {
 		ctx.handlers = make([]func(c *Context), 0, 10)
 	}
 
 	// global middleware
-	ctx.handlers = append(ctx.handlers, tcpX.mux.GlobalMiddles...)
+	ctx.handlers = append(ctx.handlers, t.mux.GlobalMiddles...)
 	// model middles
 	ctx.handlers = append(ctx.handlers, handler.ModelMiddles...)
 	// self-related middleware
@@ -205,17 +229,17 @@ func handleMessage(ctx *Context) {
 	}
 }
 
-// RegisterGlobalMiddle add global routing middle handlers.
-func (t *TcpServer) RegisterGlobalMiddle(middles ...func(ctx *Context)) {
-	t.mux.RegisterGlobalMiddle(middles...)
+// HandleReply 处理响应消息
+func (t *TcpServer) HandleReply(ctx *Context) {
+
 }
 
-// RegisterModelMiddle add routing middle handlers by modelID.
-func (t *TcpServer) RegisterModelMiddle(id modelID, middles ...func(ctx *Context)) {
-	t.mux.RegisterModelMiddle(id, middles...)
+// HandlePush 处理推送消息
+func (t *TcpServer) HandlePush(ctx *Context) {
+
 }
 
-// RegisterHandler add routing handlers by modelID and subMsgID.
-func (t *TcpServer) RegisterHandler(id modelID, subID subMsgID, handler func(ctx *Context), middles ...func(ctx *Context)) {
-	t.mux.RegisterHandler(id, subID, handler, middles...)
+// HandleHeartBeat 处理心跳消息
+func (t *TcpServer) HandleHeartBeat(ctx *Context) {
+
 }

@@ -1,6 +1,9 @@
 package message
 
-import "github.com/ywanbing/spider/codec"
+import (
+	"github.com/ywanbing/spider/code"
+	"github.com/ywanbing/spider/codec"
+)
 
 // RawMessage msg 实现
 // msgSize = 4
@@ -47,6 +50,27 @@ func (m *RawMessage) GetMsgId() uint32 {
 		return 0
 	}
 	return m.msgId
+}
+
+func (m *RawMessage) Check() error {
+	if m == nil {
+		return code.ErrNilMessage
+	}
+
+	if m.metadata == nil {
+		return code.ErrNilMetadata
+	}
+
+	if m.metadata[MsgTypeKey] == nil {
+		return code.ErrNilMsgType
+	}
+
+	// 如果是请求消息，那么必须要有Seq
+	if m.metadata[MsgTypeKey] == MsgTypeRequest && m.metadata[MsgSeq] == nil {
+		return code.ErrNilMsgSeq
+	}
+
+	return nil
 }
 
 func NewMessage(msgId uint32, protoType codec.MarshalType, metadata map[string]any, body []byte) *RawMessage {

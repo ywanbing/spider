@@ -1,6 +1,7 @@
 package spider
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -21,17 +22,20 @@ type TcpConn interface {
 	GetConnId() uint64
 	SetConnId(uint64)
 
-	Start(t *TcpServer)
+	Start()
 
 	SendMsg(message.Message) error
+
+	// StopNotifyChan 关闭的时候，需要被通知
+	StopNotifyChan() chan struct{}
 }
 
 type tcpConn struct {
 	*net.TCPConn
 	proto.Proto
 
-	// 保存一个顶级对象的引用
-	t *TcpServer
+	// 消息处理函数
+	handleFunc func(ctx *Context)
 
 	// 创建连接的配置。
 	cfg ConnConfig
@@ -46,19 +50,22 @@ type tcpConn struct {
 	recvChan chan []byte
 	sendChan chan []byte
 
-	stop bool
+	stop           bool
+	stopNotifyChan chan struct{}
 }
 
 var _ TcpConn = new(tcpConn)
 
-func NewTcpConn(conn *net.TCPConn, cfg ConnConfig) TcpConn {
+func NewTcpConn(conn *net.TCPConn, cfg ConnConfig, handleFunc func(ctx *Context)) TcpConn {
 	return &tcpConn{
-		TCPConn:    conn,
-		Proto:      cfg.p,
-		cfg:        cfg,
-		bufferPool: common.NewLimitedPool(cfg.binaryPoolMinSize, cfg.binaryPoolMaxSize),
-		recvChan:   make(chan []byte, cfg.maxRecvMsgNum),
-		sendChan:   make(chan []byte, cfg.maxSendMsgNum),
+		TCPConn:        conn,
+		Proto:          cfg.p,
+		cfg:            cfg,
+		handleFunc:     handleFunc,
+		bufferPool:     common.NewLimitedPool(cfg.binaryPoolMinSize, cfg.binaryPoolMaxSize),
+		recvChan:       make(chan []byte, cfg.maxRecvMsgNum),
+		sendChan:       make(chan []byte, cfg.maxSendMsgNum),
+		stopNotifyChan: make(chan struct{}),
 	}
 }
 
@@ -76,9 +83,7 @@ func (t *tcpConn) SetConnId(connId uint64) {
 	t.connId = connId
 }
 
-func (t *tcpConn) Start(x *TcpServer) {
-	t.t = x
-
+func (t *tcpConn) Start() {
 	go t.handFunc()
 	go t.send()
 }
@@ -91,7 +96,12 @@ func (t *tcpConn) Stop() {
 	_ = t.Close()
 	close(t.recvChan)
 	close(t.sendChan)
+	close(t.stopNotifyChan)
 	return
+}
+
+func (t *tcpConn) StopNotifyChan() chan struct{} {
+	return t.stopNotifyChan
 }
 
 func (t *tcpConn) IsStop() bool {
@@ -101,12 +111,14 @@ func (t *tcpConn) IsStop() bool {
 func (t *tcpConn) recv() {
 	defer t.Stop()
 	sizeByte := make([]byte, 4)
+
+	reader := bufio.NewReaderSize(t, int(t.cfg.recvBufferSize))
 	for {
-		if t.t.IsClosed() || t.IsStop() {
+		if t.IsStop() {
 			return
 		}
 
-		_, err := io.ReadFull(t, sizeByte)
+		_, err := io.ReadFull(reader, sizeByte)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				continue
@@ -120,7 +132,7 @@ func (t *tcpConn) recv() {
 		allSize := binary.BigEndian.Uint32(sizeByte)
 		data := t.bufferPool.Get(int(allSize))
 
-		_, err = io.ReadFull(t, data)
+		_, err = io.ReadFull(reader, data)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				continue
@@ -156,7 +168,7 @@ func (t *tcpConn) SendMsg(data message.Message) error {
 func (t *tcpConn) send() {
 	defer t.Stop()
 	for msg := range t.sendChan {
-		if t.t.IsClosed() || t.IsStop() {
+		if t.IsStop() {
 			return
 		}
 
@@ -166,7 +178,6 @@ func (t *tcpConn) send() {
 			// TODO LOG
 			return
 		}
-		t.bufferPool.Put(msg)
 	}
 }
 
@@ -174,18 +185,30 @@ func (t *tcpConn) handFunc() {
 	defer t.Stop()
 	go t.recv()
 	for msg := range t.recvChan {
-		if t.t.IsClosed() || t.IsStop() {
+		if t.IsStop() {
 			return
 		}
 
 		m, _ := t.Unpack(msg)
-
 		// 回收
 		t.bufferPool.Put(msg)
 
-		ctx := NewContext(context.Background(), m, t, t.t)
+		// 检查消息
+		if err := m.Check(); err != nil {
+			// 只有请求的消息才会返回错误
+			if m.GetHeader()[message.MsgTypeKey] != message.MsgTypeRequest {
+				continue
+			}
+			m.SetHeader(message.MsgErr, err.Error())
+			m.SetHeader(message.MsgTypeKey, message.MsgTypeReply)
+			m.SetBody(nil)
+			t.SendMsg(m)
+			continue
+		}
+
+		ctx := NewContext(context.Background(), m, t)
 
 		// 消息处理函数
-		go handleMessage(ctx)
+		go t.handleFunc(ctx)
 	}
 }

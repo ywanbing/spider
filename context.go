@@ -26,13 +26,12 @@ type Context struct {
 	handlers []func(*Context)
 }
 
-func NewContext(ctx context.Context, reqMsg message.Message, conn TcpConn, t *TcpServer) *Context {
+func NewContext(ctx context.Context, reqMsg message.Message, conn TcpConn) *Context {
 	return &Context{
 		ctx:    ctx,
 		reqMsg: reqMsg,
 		conn:   conn,
 		offset: -1,
-		t:      t,
 	}
 }
 

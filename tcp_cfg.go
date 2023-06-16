@@ -10,6 +10,7 @@ import (
 var defaultConnConfig = ConnConfig{
 	maxSendMsgNum:     1000,
 	maxRecvMsgNum:     10000,
+	recvBufferSize:    16 * 1024,
 	binaryPoolMinSize: 512,
 	binaryPoolMaxSize: 512 * 1024,
 	readTimeout:       3 * time.Second,
@@ -26,6 +27,9 @@ type ConnConfig struct {
 	// 接收消息缓冲区最大消息数量。默认值：10000。
 	maxRecvMsgNum int32
 
+	// 接收缓冲区大小。默认值：16 * 1024（16K）。
+	recvBufferSize int32
+
 	// 二进制数组对象池最小值。默认值：512 (0.5K)。
 	binaryPoolMinSize int
 	// 二进制数组对象池最大值。默认值：512 * 1024（512K) 。
@@ -33,9 +37,8 @@ type ConnConfig struct {
 	binaryPoolMaxSize int
 
 	// 心跳控制 TODO
-	HeartBeatOn        bool
-	HeartBeatMessageID int32
-	HeartBeatInterval  time.Duration
+	HeartBeatOn       bool
+	HeartBeatInterval time.Duration
 
 	// 创建连接是否允许的处理程序,
 	// 如果返回false，则不允许创建连接；
@@ -55,7 +58,9 @@ type ConnConfig struct {
 
 	// client config options
 	// Addr is the server address to connect to.
-	Addr string
+	addr string
+	// 连接断开后是否自动重连
+	reconnection bool
 }
 
 type ConnConfigOption func(ConnConfig) ConnConfig
@@ -132,6 +137,41 @@ func WithProto(p proto.Proto) ConnConfigOption {
 		if p != nil {
 			cfg.p = p
 		}
+		return cfg
+	}
+}
+
+// WithRecvBufferSize sets the recv buffer size.
+func WithRecvBufferSize(size int32) ConnConfigOption {
+	return func(cfg ConnConfig) ConnConfig {
+		if size > 0 {
+			cfg.recvBufferSize = size
+		}
+		return cfg
+	}
+}
+
+// WithHeartBeat sets the heart beat.
+func WithHeartBeat(interval time.Duration) ConnConfigOption {
+	return func(cfg ConnConfig) ConnConfig {
+		cfg.HeartBeatOn = true
+		cfg.HeartBeatInterval = interval
+		return cfg
+	}
+}
+
+// WithAddr sets the server address.
+func WithAddr(addr string) ConnConfigOption {
+	return func(cfg ConnConfig) ConnConfig {
+		cfg.addr = addr
+		return cfg
+	}
+}
+
+// WithReconnection sets the reconnection.
+func WithReconnection(reconnection bool) ConnConfigOption {
+	return func(cfg ConnConfig) ConnConfig {
+		cfg.reconnection = reconnection
 		return cfg
 	}
 }
