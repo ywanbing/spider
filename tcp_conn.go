@@ -130,7 +130,7 @@ func (t *tcpConn) recv() {
 
 		// 读取消息长度
 		allSize := binary.BigEndian.Uint32(sizeByte)
-		data := t.bufferPool.Get(int(allSize))
+		data := t.bufferPool.Get(int(allSize - proto.MsgSize))
 
 		_, err = io.ReadFull(reader, data)
 		if err != nil {

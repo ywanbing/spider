@@ -74,6 +74,12 @@ func (c *Context) ProtoBuf(msgId uint32, src interface{}, meatData ...map[string
 	return c.commonReplyWithMarshaller(codec.ProtobufMarshaller{}, msgId, src, meatData...)
 }
 
+// Raw Reply to client using protobuf marshaller.
+// Whatever ctx.Packx.Marshaller.MarshalName is 'protobuf' or not , message block will marshal its header and body by protobuf marshaller.
+func (c *Context) Raw(msgId uint32, src interface{}, meatData ...map[string]any) error {
+	return c.commonReplyWithMarshaller(codec.RawMarshaller{}, msgId, src, meatData...)
+}
+
 func (c *Context) commonReplyWithMarshaller(marshaller codec.Marshaller, msgId uint32, src any, meatData ...map[string]any) error {
 	bytes, err := marshaller.Marshal(src)
 	if err != nil {
@@ -81,11 +87,14 @@ func (c *Context) commonReplyWithMarshaller(marshaller codec.Marshaller, msgId u
 	}
 
 	// 默认第一个为metadata
-	md := make(map[string]any)
+	md := c.reqMsg.GetHeader()
 	if len(meatData) > 0 {
-		md = meatData[0]
+		for k, v := range meatData[0] {
+			md[k] = v
+		}
 	}
 
+	md[message.MsgTypeKey] = message.MsgTypeReply
 	return c.conn.SendMsg(message.NewMessage(msgId, marshaller.MarshalType(), md, bytes))
 }
 

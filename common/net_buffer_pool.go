@@ -16,7 +16,7 @@ func newLevelPool(size int) *LevelPool {
 		pool: sync.Pool{
 			New: func() interface{} {
 				data := make([]byte, size)
-				return &data
+				return data
 			},
 		},
 	}

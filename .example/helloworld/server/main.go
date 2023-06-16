@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/ywanbing/spider"
+	"github.com/ywanbing/spider/common"
 )
 
 func main() {
@@ -25,7 +27,7 @@ func main() {
 		data := ctx.RawData()
 		fmt.Println(string(data))
 
-		ctx.JSON(2, []byte("hello world"))
+		ctx.Raw(common.NewMsgIdWithSubMsgID(1, 1), []byte("hello world"))
 	})
 
 	tcpX.ListenAndServe("tcp", ":8089")

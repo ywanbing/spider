@@ -176,8 +176,9 @@ func (t *TcpServer) RegisterHandler(id modelID, subID subMsgID, handler func(ctx
 // handleMessage 服务器处理消息
 func (t *TcpServer) handleMessage(ctx *Context) {
 	header := ctx.reqMsg.GetHeader()
-	switch header[message.MsgTypeKey] {
+	switch message.MsgType(header[message.MsgTypeKey].(float64)) {
 	case message.MsgTypeRequest:
+		fmt.Printf("recv request msg: %s", string(ctx.reqMsg.GetBody()))
 		// 请求消息
 		t.HandleRequest(ctx)
 	case message.MsgTypeHeartBeat:

@@ -1,6 +1,7 @@
 package spider
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -41,8 +42,13 @@ func (t *TcpClient) Start() error {
 		return err
 	}
 
-	t.TcpConn = NewTcpConn(conn.(*net.TCPConn), t.cfg, t.handleMessage)
+	tcpConn := NewTcpConn(conn.(*net.TCPConn), t.cfg, t.handleMessage)
+	if !t.cfg.onConnHandle(tcpConn) {
+		tcpConn.Close()
+		return fmt.Errorf("onConnHandle error")
+	}
 
+	t.TcpConn = tcpConn
 	t.TcpConn.Start()
 
 	// 开启一个协程用来处理断线重连
@@ -107,7 +113,7 @@ func (t *TcpClient) RegisterHandler(id modelID, subID subMsgID, handler func(ctx
 // handleMessage 服务器处理消息
 func (t *TcpClient) handleMessage(ctx *Context) {
 	header := ctx.reqMsg.GetHeader()
-	switch header[message.MsgTypeKey] {
+	switch message.MsgType(header[message.MsgTypeKey].(float64)) {
 	case message.MsgTypeReply:
 		// 响应消息
 		t.HandleReply(ctx)
@@ -124,7 +130,9 @@ func (t *TcpClient) handleMessage(ctx *Context) {
 
 // HandleReply 处理响应消息
 func (t *TcpClient) HandleReply(ctx *Context) {
-
+	//	print msg
+	body := ctx.reqMsg.GetBody()
+	fmt.Printf("recv reply msg: %s", string(body))
 }
 
 // HandlePush 处理推送消息
