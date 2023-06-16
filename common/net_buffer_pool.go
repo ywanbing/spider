@@ -1,17 +1,17 @@
-package spider
+package common
 
 import (
 	"math"
 	"sync"
 )
 
-type levelPool struct {
+type LevelPool struct {
 	size int
 	pool sync.Pool
 }
 
-func newLevelPool(size int) *levelPool {
-	return &levelPool{
+func newLevelPool(size int) *LevelPool {
+	return &LevelPool{
 		size: size,
 		pool: sync.Pool{
 			New: func() interface{} {
@@ -25,7 +25,7 @@ func newLevelPool(size int) *levelPool {
 type LimitedPool struct {
 	minSize int
 	maxSize int
-	pools   []*levelPool
+	pools   []*LevelPool
 }
 
 func NewLimitedPool(minSize, maxSize int) *LimitedPool {
@@ -33,7 +33,7 @@ func NewLimitedPool(minSize, maxSize int) *LimitedPool {
 		panic("maxSize can't be less than minSize")
 	}
 	const multiplier = 2
-	var pools []*levelPool
+	var pools []*LevelPool
 	curSize := minSize
 	for curSize < maxSize {
 		pools = append(pools, newLevelPool(curSize))
@@ -47,7 +47,7 @@ func NewLimitedPool(minSize, maxSize int) *LimitedPool {
 	}
 }
 
-func (p *LimitedPool) findPool(size int) *levelPool {
+func (p *LimitedPool) findPool(size int) *LevelPool {
 	if size > p.maxSize {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (p *LimitedPool) findPool(size int) *levelPool {
 	return p.pools[idx]
 }
 
-func (p *LimitedPool) findPutPool(size int) *levelPool {
+func (p *LimitedPool) findPutPool(size int) *LevelPool {
 	if size > p.maxSize {
 		return nil
 	}
@@ -79,22 +79,22 @@ func (p *LimitedPool) findPutPool(size int) *levelPool {
 	return p.pools[idx]
 }
 
-func (p *LimitedPool) Get(size int) *[]byte {
+func (p *LimitedPool) Get(size int) []byte {
 	sp := p.findPool(size)
 	if sp == nil {
 		data := make([]byte, size)
-		return &data
+		return data
 	}
-	buf := sp.pool.Get().(*[]byte)
-	*buf = (*buf)[:size]
+	buf := sp.pool.Get().([]byte)
+	buf = (buf)[:size]
 	return buf
 }
 
-func (p *LimitedPool) Put(b *[]byte) {
-	sp := p.findPutPool(cap(*b))
+func (p *LimitedPool) Put(b []byte) {
+	sp := p.findPutPool(cap(b))
 	if sp == nil {
 		return
 	}
-	*b = (*b)[:cap(*b)]
+	b = b[:cap(b)]
 	sp.pool.Put(b)
 }

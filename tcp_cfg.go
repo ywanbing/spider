@@ -3,6 +3,8 @@ package spider
 import (
 	"crypto/tls"
 	"time"
+
+	"github.com/ywanbing/spider/proto"
 )
 
 var defaultConnConfig = ConnConfig{
@@ -15,6 +17,7 @@ var defaultConnConfig = ConnConfig{
 	onConnHandle: func(conn TcpConn) bool {
 		return true
 	},
+	p: proto.NewRawProto(),
 }
 
 type ConnConfig struct {
@@ -46,6 +49,13 @@ type ConnConfig struct {
 
 	// If you want your tcp server using certs, using this field
 	tlSConfig *tls.Config
+
+	// 默认的协议解析
+	p proto.Proto
+
+	// client config options
+	// Addr is the server address to connect to.
+	Addr string
 }
 
 type ConnConfigOption func(ConnConfig) ConnConfig
@@ -111,6 +121,16 @@ func WithTLSConfig(tlsConfig *tls.Config) ConnConfigOption {
 	return func(cfg ConnConfig) ConnConfig {
 		if tlsConfig != nil {
 			cfg.tlSConfig = tlsConfig
+		}
+		return cfg
+	}
+}
+
+// WithProto sets the tcp server proto.
+func WithProto(p proto.Proto) ConnConfigOption {
+	return func(cfg ConnConfig) ConnConfig {
+		if p != nil {
+			cfg.p = p
 		}
 		return cfg
 	}
