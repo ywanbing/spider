@@ -71,7 +71,7 @@ func (r RawProto) Unpack(data []byte) (message.Message, error) {
 	copy(bodyData, data[12+meatDataLen:])
 
 	// 1. 解析元数据
-	meat := make(map[string]any)
+	meat := make(map[string]string)
 	if meatDataLen > 0 {
 		err := json.Unmarshal(meatData, &meat)
 		if err != nil {

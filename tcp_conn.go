@@ -196,11 +196,11 @@ func (t *tcpConn) handFunc() {
 		// 检查消息
 		if err := m.Check(); err != nil {
 			// 只有请求的消息才会返回错误
-			if m.GetHeader()[message.MsgTypeKey] != message.MsgTypeRequest {
+			if message.MsgTypeFromString(m.GetHeader()[message.MsgTypeKey]) != message.MsgTypeRequest {
 				continue
 			}
 			m.SetHeader(message.MsgErr, err.Error())
-			m.SetHeader(message.MsgTypeKey, message.MsgTypeReply)
+			m.SetHeader(message.MsgTypeKey, message.MsgTypeReply.String())
 			m.SetBody(nil)
 			t.SendMsg(m)
 			continue

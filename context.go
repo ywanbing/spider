@@ -64,23 +64,23 @@ func (c *Context) Abort() {
 
 // JSON Reply to client using json marshaller.
 // Whatever ctx.Packx.Marshaller.MarshalName is 'json' or not , message block will marshal its header and body by json marshaller.
-func (c *Context) JSON(msgId uint32, src interface{}, meatData ...map[string]any) error {
+func (c *Context) JSON(msgId uint32, src interface{}, meatData ...map[string]string) error {
 	return c.commonReplyWithMarshaller(codec.JsonMarshaller{}, msgId, src, meatData...)
 }
 
 // ProtoBuf Reply to client using protobuf marshaller.
 // Whatever ctx.Packx.Marshaller.MarshalName is 'protobuf' or not , message block will marshal its header and body by protobuf marshaller.
-func (c *Context) ProtoBuf(msgId uint32, src interface{}, meatData ...map[string]any) error {
+func (c *Context) ProtoBuf(msgId uint32, src interface{}, meatData ...map[string]string) error {
 	return c.commonReplyWithMarshaller(codec.ProtobufMarshaller{}, msgId, src, meatData...)
 }
 
 // Raw Reply to client using protobuf marshaller.
 // Whatever ctx.Packx.Marshaller.MarshalName is 'protobuf' or not , message block will marshal its header and body by protobuf marshaller.
-func (c *Context) Raw(msgId uint32, src interface{}, meatData ...map[string]any) error {
+func (c *Context) Raw(msgId uint32, src interface{}, meatData ...map[string]string) error {
 	return c.commonReplyWithMarshaller(codec.RawMarshaller{}, msgId, src, meatData...)
 }
 
-func (c *Context) commonReplyWithMarshaller(marshaller codec.Marshaller, msgId uint32, src any, meatData ...map[string]any) error {
+func (c *Context) commonReplyWithMarshaller(marshaller codec.Marshaller, msgId uint32, src any, meatData ...map[string]string) error {
 	bytes, err := marshaller.Marshal(src)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (c *Context) commonReplyWithMarshaller(marshaller codec.Marshaller, msgId u
 		}
 	}
 
-	md[message.MsgTypeKey] = message.MsgTypeReply
+	md[message.MsgTypeKey] = message.MsgTypeReply.String()
 	return c.conn.SendMsg(message.NewMessage(msgId, marshaller.MarshalType(), md, bytes))
 }
 
@@ -111,4 +111,24 @@ func (c *Context) RawData() []byte {
 // MarshallerType 获取解析类型，请配合RawData使用
 func (c *Context) MarshallerType() codec.MarshalType {
 	return c.reqMsg.GetMarshalType()
+}
+
+// GetCtx 获取上下文
+func (c *Context) GetCtx() context.Context {
+	return c.ctx
+}
+
+// SetCtx 获取上下文
+func (c *Context) SetCtx(ctx context.Context) {
+	c.ctx = ctx
+}
+
+// GetReqMsgId 获取上下文
+func (c *Context) GetReqMsgId() uint32 {
+	return c.reqMsg.GetMsgId()
+}
+
+// GetReqMsg 获取上下文
+func (c *Context) GetReqMsg() message.Message {
+	return c.reqMsg
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"time"
+	"context"
 
 	"github.com/ywanbing/spider"
 	"github.com/ywanbing/spider/codec"
@@ -16,12 +16,16 @@ func main() {
 	client.Start()
 
 	// TODO
-	msg := message.NewMessage(common.NewMsgIdWithSubMsgID(1, 1), codec.MarshalType_Json, map[string]any{
-		message.MsgTypeKey: message.MsgTypeRequest,
-		message.MsgSeq:     1,
+	msg := message.NewMessage(common.NewMsgIdWithSubMsgID(1, 1), codec.MarshalType_Raw, map[string]string{
+		message.MsgTypeKey: message.MsgTypeRequest.String(),
 	}, []byte("hello world"))
-	client.SendMsg(msg)
 
-	time.Sleep(time.Second * 5)
+	resp, err := client.Call(context.Background(), msg)
+	if err != nil {
+		panic(err)
+	}
+
+	println(string(resp.GetBody()))
+
 	client.Close()
 }
