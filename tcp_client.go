@@ -107,7 +107,7 @@ func (t *TcpClient) reconnect() {
 	// 断线重连策略
 
 	reconnectTimes := 0
-	reconnectTime := 1 // 重连间隔
+	reconnectTime := 10 // 重连间隔
 	for {
 		select {
 		case <-t.close:
@@ -117,11 +117,11 @@ func (t *TcpClient) reconnect() {
 				// TODO log
 				return
 			}
-			time.Sleep(time.Duration(reconnectTime) * time.Second)
+			time.Sleep(time.Duration(reconnectTime) * time.Millisecond)
 			reconnectTimes++
 			reconnectTime *= 2
-			if reconnectTime > 10 {
-				reconnectTime = 10
+			if reconnectTime > 5000 {
+				reconnectTime = 5000
 			}
 
 			conn, err := net.Dial("tcp", t.cfg.addr)
@@ -134,7 +134,7 @@ func (t *TcpClient) reconnect() {
 
 			t.TcpConn.Start()
 			reconnectTimes = 0
-			reconnectTime = 1
+			reconnectTime = 10
 		}
 	}
 }
